@@ -12,6 +12,25 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, time
 
+print("Loading the libraries, please wait...")
+# === CONFIG ===
+ASSET_URL = "https://unisa.telematics.guru/Report?ReportId=21"
+TRIP_LIST_URL = "https://unisa.telematics.guru/Report?ReportId=2"
+ASSET_LOCATION_URL = "https://unisa.telematics.guru/Report?ReportId=62"
+IOT_DATA_URL = "https://unisa.telematics.guru/Report?ReportId=49"
+
+# list of exclude assets by name or code
+EXCLUDED_ASSETS = ['1066452', '1070033', '1070100', '981892', 
+                  '982178', '982276', '982993', '983084', '983108', '983171',
+                    'East P - Oyster' #not attached
+]
+
+DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads")
+ASSET_LIST = "Asset List"
+TRIP_LIST = "Trip List"
+IOT_DATA = "IoT Data"
+ASSET_LOCATION = "Asset Location"
+
 def get_date_input(prompt, is_start=True):
     while True:
         date_str = input(prompt)
@@ -87,7 +106,16 @@ def download_and_read_assest_list():
         raise FileNotFoundError("❌ No CSV file found matching 'AssetList*.csv'")
     asset_csv_file = csv_files[0]  # use the first one found
 
-    return pd.read_csv(asset_csv_file)
+     # Read CSV
+    df = pd.read_csv(asset_csv_file)
+
+    # Filter out excluded assets
+    df = df[~df['Name'].isin(EXCLUDED_ASSETS) & ~df['Asset Code'].isin(EXCLUDED_ASSETS)]
+
+    # Overwrite CSV with filtered data
+    df.to_csv(asset_csv_file, index=False)
+
+    return df
 
 def download_and_merge_asset_location(asset_names):
     file_location = os.path.join(DOWNLOAD_DIR, ASSET_LOCATION, "AssetLocation.csv")
@@ -233,22 +261,12 @@ def download_IOT_info(asset_names):
     move_all_files_into_new_location(DOWNLOAD_DIR, file_location)
     print("✅ All IOT Data downloaded!")
 
-print("Loading the libraries, please wait...")
-# === CONFIG ===
-ASSET_URL = "https://unisa.telematics.guru/Report?ReportId=21"
-TRIP_LIST_URL = "https://unisa.telematics.guru/Report?ReportId=2"
-ASSET_LOCATION_URL = "https://unisa.telematics.guru/Report?ReportId=62"
-IOT_DATA_URL = "https://unisa.telematics.guru/Report?ReportId=49"
 
-DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads")
-ASSET_LIST = "Asset List"
-TRIP_LIST = "Trip List"
-IOT_DATA = "IoT Data"
-ASSET_LOCATION = "Asset Location"
-
-# remove old folder and create new one
-if os.path.exists(DOWNLOAD_DIR):
-    shutil.rmtree(DOWNLOAD_DIR)
+# remove old folders and create new one
+for folder_name in [ASSET_LIST, TRIP_LIST, IOT_DATA, ASSET_LOCATION, '']:
+    old_folder_path = os.path.join(DOWNLOAD_DIR, folder_name)
+    if os.path.exists(old_folder_path):
+        shutil.rmtree(old_folder_path)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True) 
 
 # === SETUP SELENIUM ===
@@ -277,6 +295,7 @@ print("\n Automation is running, please wait...")
 
 # download and read asset list into data frame
 asset_df = download_and_read_assest_list()
+
 download_and_merge_asset_location(asset_df['Name'].tolist())
 
 # download trip list

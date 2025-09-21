@@ -1,0 +1,4 @@
+script/build/*
+script/dist/*
+script/downloads/*
+script/download_IOT_data.spec
