@@ -22,7 +22,9 @@ IOT_DATA_URL = "https://unisa.telematics.guru/Report?ReportId=49"
 # list of exclude assets by name or code
 EXCLUDED_ASSETS = ['1066452', '1070033', '1070100', '981892', 
                   '982178', '982276', '982993', '983084', '983108', '983171',
-                    'East P - Oyster' #not attached
+                    'East P - Oyster', #not attached
+                    'ECH - Sit Up P', #duplicated from 'ECH - Sit-Up B'
+                    'Le Fev - Walk O', 'LCR - Wobble O' # removed as duplicate of their respective (Barra) versions
 ]
 
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads")
