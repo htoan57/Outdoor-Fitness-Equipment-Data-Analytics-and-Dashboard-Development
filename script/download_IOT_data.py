@@ -157,20 +157,37 @@ def download_and_merge_asset_location(asset_names):
     if len(csv_files) != len(asset_names):
         raise ValueError("❌ Number of files and asset_names must be the same")
     
-    # Collect first rows of every files
     rows = []
     for file, device in zip(csv_files, asset_names):
         try:
-            # Read the first *data* row (skip header, take one row)
-            df = pd.read_csv(file, skiprows=1, nrows=1, header=None)
+            if device == 'Salisbury Oval - Body Twist':
+                columns = [
+                    "Date Logged (ACT (+09:30))",
+                    "Log Reason",
+                    "Latitude",
+                    "Longitude",
+                    "Speed KmH",
+                    "Ignition",
+                    "Driver Id Data",
+                    "Trip Type Code",
+                    "Project Code",
+                    "Device Name"
+                ]
 
-            # Read header separately to assign correct column names
-            header = pd.read_csv(file, nrows=0).columns
-            df.columns = header
-
-            if not df.empty:
-                df["Device Name"] = device
+                df = pd.DataFrame(columns=columns)
+                df.loc[0] = [None, None, -34.7682900, 138.6446800, None, None, None, None, None, device]
                 rows.append(df)
+            else:
+                # Read the first *data* row (skip header, take one row)
+                df = pd.read_csv(file, skiprows=1, nrows=1, header=None)
+
+                # Read header separately to assign correct column names
+                header = pd.read_csv(file, nrows=0).columns
+                df.columns = header
+
+                if not df.empty:
+                    df["Device Name"] = device
+                    rows.append(df)
         except Exception as e:
             # print(f"⚠️ Could not read {file}: {e}")
             pass
@@ -258,6 +275,65 @@ def download_IOT_info(asset_names):
 
         # 4. Wait for download
         newtime.sleep(2)
+
+    import os
+import time as newtime
+import pandas as pd
+from selenium.webdriver.common.by import By
+
+def download_IOT_info(asset_names):
+    file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA)
+    driver.get(IOT_DATA_URL)
+
+    # change export type to CSV
+    csv_button = driver.find_element(By.CSS_SELECTOR, '#reportContainer div.btn-group label.btn.btn-primary.ng-scope')
+    csv_button.click()
+
+    # Set the start date 
+    start_date_field = driver.find_element(By.CSS_SELECTOR, "#StartDateUtc > input") 
+    start_date_field.clear()
+    start_date_field.send_keys(start_date.strftime('%d/%m/%Y %H:%M'))
+
+    # Set the end date
+    end_date_field = driver.find_element(By.CSS_SELECTOR, "#EndDateUtc > input") 
+    end_date_field.clear()
+    end_date_field.send_keys(end_date.strftime('%d/%m/%Y %H:%M'))
+
+    # loop through devices to download
+    for item in asset_names:
+        # 1. Select dropdown
+        dropdown = driver.find_element(By.CSS_SELECTOR, "#reportContainer div.reportParameterContainer > div:nth-child(2) > span")
+        dropdown.click()
+
+        # 2. Select the option
+        input_field = driver.find_element(By.CSS_SELECTOR, "body > span > span > span.select2-search.select2-search--dropdown > input") 
+        input_field.clear()
+        input_field.send_keys(item.strip())
+        # Click on it
+        dropdown_item = driver.find_element(By.CSS_SELECTOR, "#select2-AssetId-results > li")
+        dropdown_item.click()
+
+        # 3. Click download button
+        driver.find_element(By.CSS_SELECTOR, "#btnDownloadReport").click()
+
+        # 4. Wait for download
+        newtime.sleep(2)
+
+    # Filter downloaded CSVs before moving
+    for filename in os.listdir(DOWNLOAD_DIR):
+        if filename.endswith(".csv"):
+            filepath = os.path.join(DOWNLOAD_DIR, filename)
+            try:
+                df = pd.read_csv(filepath)
+
+                if not df.empty and "Log Reason" in df.columns:
+                    # Keep only rows where Log Reason == 'Start Of Trip'
+                    df = df[df["Log Reason"] == "Start Of Trip"]
+
+                    # Overwrite the file with filtered data
+                    df.to_csv(filepath, index=False)
+            except Exception as e:
+                print(f"⚠️ Could not process {filename}: {e}")
 
     # Move file after download to correct location
     move_all_files_into_new_location(DOWNLOAD_DIR, file_location)
