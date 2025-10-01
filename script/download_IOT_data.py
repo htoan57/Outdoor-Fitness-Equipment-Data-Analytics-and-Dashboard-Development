@@ -235,6 +235,22 @@ def download_trip_list():
     move_all_files_into_new_location(DOWNLOAD_DIR, file_location)
     print("✅ Trip List downloaded!")
 
+    # === READ CSV ===
+    trip_list_csv_file = None
+    csv_files = glob.glob(os.path.join(file_location, "TripList*.csv"))
+    if not csv_files:
+        raise FileNotFoundError("❌ No CSV file found matching 'TripList*.csv'")
+    trip_list_csv_file = csv_files[0]  # use the first one found
+
+     # Read CSV
+    df = pd.read_csv(trip_list_csv_file)
+
+    # Filter out excluded assets
+    df = df[~df['Asset'].isin(EXCLUDED_ASSETS) & ~df['Asset Code'].isin(EXCLUDED_ASSETS)]
+
+    # Overwrite CSV with filtered data
+    df.to_csv(trip_list_csv_file, index=False)
+
 
 def download_IOT_info(asset_names):
     file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA)
