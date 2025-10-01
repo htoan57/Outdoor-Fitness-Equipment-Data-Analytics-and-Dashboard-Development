@@ -208,7 +208,11 @@ def download_and_merge_asset_location(asset_names):
         raise ValueError("❌ No valid rows found in the CSV files")
 
 
-def download_trip_list():
+def download_trip_list(asset_df):
+    # === GET IOT INFO ===
+    asset_with_4G_df = asset_df[asset_df['Device Type'].str.contains('Oyster Edge', na=False)] # only get devices with IOT details = Oyster Edge
+    IoT_df = download_IOT_info(asset_with_4G_df['Name'].tolist(), asset_with_4G_df['Asset Code'].tolist())
+
     file_location = os.path.join(DOWNLOAD_DIR, TRIP_LIST)
 
     # load page
@@ -248,13 +252,20 @@ def download_trip_list():
     # Filter out excluded assets
     df = df[~df['Asset'].isin(EXCLUDED_ASSETS) & ~df['Asset Code'].isin(EXCLUDED_ASSETS)]
 
-    # Overwrite CSV with filtered data
-    df.to_csv(trip_list_csv_file, index=False)
+    #
+    merged = pd.merge(
+        df,
+        IoT_df,
+        how="left",
+        left_on=["Asset Code", "Start Date"],
+        right_on=["Asset Code", "Date Logged (ACT (+09:30))"]
+    )
+    merged = merged.drop(columns=["Date Logged (ACT (+09:30))"])
 
-def download_IOT_info(asset_names, asset_codes):
-    file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA, "DeviceDataIOTelemetryExport.csv")
-    os.makedirs(os.path.join(DOWNLOAD_DIR, IOT_DATA), exist_ok=True)
-    
+    # Overwrite CSV with filtered data
+    merged.to_csv(trip_list_csv_file, index=False)
+
+def download_IOT_info(asset_names, asset_codes):   
     driver.get(IOT_DATA_URL)
     # change export type to CSV
     csv_button = driver.find_element(By.CSS_SELECTOR, '#reportContainer div.btn-group label.btn.btn-primary.ng-scope')
@@ -319,7 +330,6 @@ def download_IOT_info(asset_names, asset_codes):
     
     if rows:
         final_df = pd.concat(rows, ignore_index=True)
-        final_df.to_csv(file_location, index=False)
 
         # Remove original CSV files
         for file in csv_files:
@@ -329,6 +339,7 @@ def download_IOT_info(asset_names, asset_codes):
                 pass
 
         print("✅ All IOT Data downloaded!") 
+        return final_df
     else:
         raise ValueError("❌ No valid rows found in the CSV files")
 
@@ -369,11 +380,8 @@ asset_df = download_and_read_assest_list()
 download_and_merge_asset_location(asset_df['Name'].tolist())
 
 # download trip list
-download_trip_list()
+download_trip_list(asset_df)
 
-# === GET IOT INFO ===
-asset_with_4G_df = asset_df[asset_df['Device Type'].str.contains('Oyster Edge', na=False)] # only get devices with IOT details = Oyster Edge
-download_IOT_info(asset_with_4G_df['Name'].tolist(), asset_with_4G_df['Asset Code'].tolist())
 print("✅ All downloads complete.")
 
 driver.quit()
