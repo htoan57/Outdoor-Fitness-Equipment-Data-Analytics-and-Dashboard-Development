@@ -251,55 +251,11 @@ def download_trip_list():
     # Overwrite CSV with filtered data
     df.to_csv(trip_list_csv_file, index=False)
 
-
-def download_IOT_info(asset_names):
-    file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA)
+def download_IOT_info(asset_names, asset_codes):
+    file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA, "DeviceDataIOTelemetryExport.csv")
+    os.makedirs(os.path.join(DOWNLOAD_DIR, IOT_DATA), exist_ok=True)
+    
     driver.get(IOT_DATA_URL)
-
-    # change export type to CSV
-    csv_button = driver.find_element(By.CSS_SELECTOR, '#reportContainer div.btn-group label.btn.btn-primary.ng-scope')
-    csv_button.click()
-
-    # Set the start date 
-    start_date_field = driver.find_element(By.CSS_SELECTOR, "#StartDateUtc > input") 
-    start_date_field.clear()
-    start_date_field.send_keys(start_date.strftime('%d/%m/%Y %H:%M'))
-
-    # Set the end date
-    end_date_field = driver.find_element(By.CSS_SELECTOR, "#EndDateUtc > input") 
-    end_date_field.clear()
-    end_date_field.send_keys(end_date.strftime('%d/%m/%Y %H:%M'))
-
-
-    # loop through devices to download
-    for item in asset_names:
-        # 1. Select dropdown
-        dropdown = driver.find_element(By.CSS_SELECTOR, "#reportContainer div.reportParameterContainer > div:nth-child(2) > span")
-        dropdown.click()
-
-        # 2. Select the option
-        input_field = driver.find_element(By.CSS_SELECTOR, "body > span > span > span.select2-search.select2-search--dropdown > input") 
-        input_field.clear()
-        input_field.send_keys(item.strip())
-        # Click on it
-        dropdown_item = driver.find_element(By.CSS_SELECTOR, "#select2-AssetId-results > li")
-        dropdown_item.click()
-
-        # 3. Click download button
-        driver.find_element(By.CSS_SELECTOR, "#btnDownloadReport").click()
-
-        # 4. Wait for download
-        newtime.sleep(2)
-
-    import os
-import time as newtime
-import pandas as pd
-from selenium.webdriver.common.by import By
-
-def download_IOT_info(asset_names):
-    file_location = os.path.join(DOWNLOAD_DIR, IOT_DATA)
-    driver.get(IOT_DATA_URL)
-
     # change export type to CSV
     csv_button = driver.find_element(By.CSS_SELECTOR, '#reportContainer div.btn-group label.btn.btn-primary.ng-scope')
     csv_button.click()
@@ -334,26 +290,47 @@ def download_IOT_info(asset_names):
         # 4. Wait for download
         newtime.sleep(2)
 
+    # === READ CSV ===
+    csv_files = glob.glob(os.path.join(DOWNLOAD_DIR, "DeviceDataIOTelemetryExport*.csv"))
+    if not csv_files:
+        raise FileNotFoundError("❌ No CSV file found matching 'DeviceDataIOTelemetryExport*.csv'")
+    
+    # Ensure the number of files matches the asset_names list
+    if len(csv_files) != len(asset_codes):
+        raise ValueError("❌ Number of files and asset_names must be the same")
+    
     # Filter downloaded CSVs before moving
-    for filename in os.listdir(DOWNLOAD_DIR):
-        if filename.endswith(".csv"):
-            filepath = os.path.join(DOWNLOAD_DIR, filename)
+    rows = []
+    for file, asset_code in zip(csv_files, asset_codes):
+        try:
+            df = pd.read_csv(file, skiprows=1, header=None)
+            header = pd.read_csv(file, nrows=0).columns
+            df.columns = header
+
+            if not df.empty and "Log Reason" in df.columns:
+                # Keep only rows where Log Reason == 'Start Of Trip'
+                df = df[df["Log Reason"] == "Start Of Trip"]
+                df = df[["Date Logged (ACT (+09:30))","ELA Puck Temp. (C)", "ELA Puck R.H. (%)"]]
+                df.dropna(inplace=True)
+                df["Asset Code"] = asset_code
+                rows.append(df)
+        except Exception as e:
+            print(f"⚠️ Could not process {file}: {e}")
+    
+    if rows:
+        final_df = pd.concat(rows, ignore_index=True)
+        final_df.to_csv(file_location, index=False)
+
+        # Remove original CSV files
+        for file in csv_files:
             try:
-                df = pd.read_csv(filepath)
-
-                if not df.empty and "Log Reason" in df.columns:
-                    # Keep only rows where Log Reason == 'Start Of Trip'
-                    df = df[df["Log Reason"] == "Start Of Trip"]
-
-                    # Overwrite the file with filtered data
-                    df.to_csv(filepath, index=False)
+                os.remove(file)
             except Exception as e:
-                print(f"⚠️ Could not process {filename}: {e}")
+                pass
 
-    # Move file after download to correct location
-    move_all_files_into_new_location(DOWNLOAD_DIR, file_location)
-    print("✅ All IOT Data downloaded!")
-
+        print("✅ All IOT Data downloaded!") 
+    else:
+        raise ValueError("❌ No valid rows found in the CSV files")
 
 # remove old folders and create new one
 for folder_name in [ASSET_LIST, TRIP_LIST, IOT_DATA, ASSET_LOCATION, '']:
@@ -391,13 +368,12 @@ asset_df = download_and_read_assest_list()
 
 download_and_merge_asset_location(asset_df['Name'].tolist())
 
-
 # download trip list
 download_trip_list()
 
 # === GET IOT INFO ===
 asset_with_4G_df = asset_df[asset_df['Device Type'].str.contains('Oyster Edge', na=False)] # only get devices with IOT details = Oyster Edge
-download_IOT_info(asset_with_4G_df['Name'].tolist())
+download_IOT_info(asset_with_4G_df['Name'].tolist(), asset_with_4G_df['Asset Code'].tolist())
 print("✅ All downloads complete.")
 
 driver.quit()
