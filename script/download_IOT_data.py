@@ -158,36 +158,35 @@ def download_and_merge_asset_location(asset_names):
         raise ValueError("❌ Number of files and asset_names must be the same")
     
     rows = []
+    header_columns = [
+        "Date Logged (ACT (+09:30))",
+        "Log Reason",
+        "Latitude",
+        "Longitude",
+        "Speed KmH",
+        "Ignition",
+        "Driver Id Data",
+        "Trip Type Code",
+        "Project Code",
+        "Device Name"
+    ]
     for file, device in zip(csv_files, asset_names):
+        # try to read the first *data* row (skip header, take one row)
         try:
-            if device == 'Salisbury Oval - Body Twist':
-                columns = [
-                    "Date Logged (ACT (+09:30))",
-                    "Log Reason",
-                    "Latitude",
-                    "Longitude",
-                    "Speed KmH",
-                    "Ignition",
-                    "Driver Id Data",
-                    "Trip Type Code",
-                    "Project Code",
-                    "Device Name"
-                ]
-
-                df = pd.DataFrame(columns=columns)
-                df.loc[0] = [None, None, -34.7682900, 138.6446800, None, None, None, None, None, device]
+            
+            df = pd.read_csv(file, skiprows=1, nrows=1, header=None)
+            header = pd.read_csv(file, nrows=0).columns
+            df.columns = header
+            df["Device Name"] = device
+        except Exception as e:
+            # if assets have no data, still add a row for future joining
+            df = pd.DataFrame(columns=header_columns)
+            now = datetime.now().strftime("%d/%m/%Y %H:%M")
+            df.loc[0] = [now, "Heartbeat Status", "", "", "", "", "", "", "", device]
+        
+        try:
+            if not df.empty:
                 rows.append(df)
-            else:
-                # Read the first *data* row (skip header, take one row)
-                df = pd.read_csv(file, skiprows=1, nrows=1, header=None)
-
-                # Read header separately to assign correct column names
-                header = pd.read_csv(file, nrows=0).columns
-                df.columns = header
-
-                if not df.empty:
-                    df["Device Name"] = device
-                    rows.append(df)
         except Exception as e:
             # print(f"⚠️ Could not read {file}: {e}")
             pass
@@ -375,6 +374,7 @@ print("\n Automation is running, please wait...")
 asset_df = download_and_read_assest_list()
 
 download_and_merge_asset_location(asset_df['Name'].tolist())
+
 
 # download trip list
 download_trip_list()
