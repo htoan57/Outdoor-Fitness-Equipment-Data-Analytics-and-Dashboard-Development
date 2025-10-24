@@ -51,8 +51,8 @@ The delivery approach combines **data engineering**, **exploratory analytics**, 
     - Profile: [https://people.unisa.edu.au/wolfgang.mayer](https://people.unisa.edu.au/wolfgang.mayer)  
 
 - **Project Team (Students):**  
-  - **Nguyen Huu Toan** – [nguhy146@mymail.unisa.edu.au](mailto:nguhy146@mymail.unisa.edu.au)  
-  - **Tran Minh Hieu** – [tramy044@mymail.unisa.edu.au](mailto:tramy044@mymail.unisa.edu.au)  
+  - **Huu Toan Nguyen** – [nguhy146@mymail.unisa.edu.au](mailto:nguhy146@mymail.unisa.edu.au)  
+  - **Minh Hieu Tran** – [tramy044@mymail.unisa.edu.au](mailto:tramy044@mymail.unisa.edu.au)  
 
 ## Repository Purpose
 This repository serves as the central hub for:
